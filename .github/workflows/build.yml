@@ -25,7 +25,7 @@ jobs:
     - name: Build with PyInstaller
       run: |
         # Replace 'main.py' with your actual filename if it's different
-        pyinstaller --onefile --noconsole myapp.py
+        pyinstaller --onedir --noconsole myapp.py
 
     - name: Upload EXE
       uses: actions/upload-artifact@v4
