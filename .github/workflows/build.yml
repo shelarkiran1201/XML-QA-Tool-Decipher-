@@ -1,6 +1,10 @@
-name: Build EXE
+name: Build and Release EXE
 
-on: workflow_dispatch  # Manual trigger via GitHub Actions UI
+on:
+  workflow_dispatch:  # Manual trigger via GitHub Actions UI
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0, v1.1.0, etc.
 
 jobs:
   build:
@@ -25,10 +29,21 @@ jobs:
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller --onefile --console --name="SurveyQAValidator" --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.scrolledtext --hidden-import=docx --hidden-import=pandas --hidden-import=openpyxl --hidden-import=openpyxl.cell._writer --hidden-import=xml.etree.ElementTree --hidden-import=xml.dom.minidom myapp.py
+        pyinstaller --onefile --windowed --name="SurveyQAValidator" --icon=app_icon.ico --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.scrolledtext --hidden-import=docx --hidden-import=pandas --hidden-import=openpyxl --hidden-import=openpyxl.cell._writer --hidden-import=xml.etree.ElementTree --hidden-import=xml.dom.minidom myapp.py
 
-    - name: Upload EXE
+    - name: Upload EXE as Artifact
       uses: actions/upload-artifact@v4
       with:
         name: SurveyQAValidator-Windows
         path: dist/*.exe
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/*.exe
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
