@@ -1,4 +1,3 @@
-
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import threading
@@ -11,6 +10,7 @@ from datetime import datetime
 import os
 from typing import Dict, List, Tuple, Optional
 import traceback
+import html
 
 class SurveyQAValidator:
     def __init__(self, root):
@@ -292,11 +292,104 @@ class SurveyQAValidator:
         
         return formatting
     
+    def clean_xml_content(self, content):
+        """Clean and fix common XML issues"""
+        lines = content.split('\n')
+        cleaned_lines = []
+        
+        for i, line in enumerate(lines, 1):
+            # Skip empty lines
+            if not line.strip():
+                cleaned_lines.append(line)
+                continue
+            
+            # Fix unescaped ampersands outside of entities and CDATA
+            # Don't touch content inside CDATA sections
+            if '<![CDATA[' not in line and ']]>' not in line:
+                # Replace standalone & with &amp; but preserve entities like &lt; &gt; &amp; etc.
+                line = re.sub(r'&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)', '&amp;', line)
+            
+            # Fix unescaped < and > in attribute values
+            # This is a simplified fix - may need more sophisticated handling
+            if '="' in line or "='" in line:
+                # Find attribute values and escape < >
+                line = re.sub(r'(<[^>]+)(\s+\w+=["\'])(.*?)(["\'])', 
+                             lambda m: m.group(1) + m.group(2) + 
+                             m.group(3).replace('<', '&lt;').replace('>', '&gt;') + 
+                             m.group(4), line)
+            
+            cleaned_lines.append(line)
+        
+        return '\n'.join(cleaned_lines)
+    
     def parse_xml_document(self):
-        """Parse XML document and extract questions"""
+        """Parse XML document and extract questions - handles Decipher format with advanced error recovery"""
         self.xml_questions = []
-        tree = ET.parse(self.xml_file)
-        root = tree.getroot()
+        
+        # Read the file content
+        with open(self.xml_file, 'r', encoding='utf-8', errors='ignore') as f:
+            xml_content = f.read()
+        
+        # Try multiple parsing strategies
+        root = None
+        parsing_method = "unknown"
+        
+        # Strategy 1: Try standard parsing
+        try:
+            tree = ET.parse(self.xml_file)
+            root = tree.getroot()
+            parsing_method = "standard"
+            self.log("  Using standard XML parsing")
+        except ET.ParseError as e:
+            self.log(f"  Standard parsing failed: {str(e)}")
+            
+            # Strategy 2: Clean the XML and try again
+            try:
+                self.log("  Attempting to clean and fix XML issues...")
+                cleaned_content = self.clean_xml_content(xml_content)
+                root = ET.fromstring(cleaned_content)
+                parsing_method = "cleaned"
+                self.log("  ✓ XML issues fixed and parsed successfully")
+            except ET.ParseError as e2:
+                self.log(f"  Cleaned parsing failed: {str(e2)}")
+                
+                # Strategy 3: Wrap in root element (Decipher compatibility mode)
+                try:
+                    self.log("  Applying Decipher XML compatibility mode...")
+                    
+                    # Remove XML declaration if present
+                    xml_lines = xml_content.split('\n')
+                    if xml_lines and xml_lines[0].strip().startswith('<?xml'):
+                        xml_lines = xml_lines[1:]
+                    
+                    clean_content = '\n'.join(xml_lines)
+                    cleaned_content = self.clean_xml_content(clean_content)
+                    wrapped_xml = f'<root>\n{cleaned_content}\n</root>'
+                    
+                    root = ET.fromstring(wrapped_xml)
+                    parsing_method = "wrapped"
+                    self.log("  ✓ Successfully parsed using compatibility mode")
+                except ET.ParseError as e3:
+                    # Strategy 4: Show detailed error information
+                    self.log(f"  All parsing strategies failed")
+                    self.log(f"  Error: {str(e3)}")
+                    
+                    # Extract line number from error
+                    error_match = re.search(r'line (\d+)', str(e3))
+                    if error_match:
+                        error_line = int(error_match.group(1))
+                        self.log(f"\n  Problematic area around line {error_line}:")
+                        lines = xml_content.split('\n')
+                        start = max(0, error_line - 3)
+                        end = min(len(lines), error_line + 2)
+                        for i in range(start, end):
+                            marker = " >>> " if i == error_line - 1 else "     "
+                            self.log(f"{marker}{i+1}: {lines[i][:100]}")
+                    
+                    raise Exception(f"Unable to parse XML file. {str(e3)}")
+        
+        if root is None:
+            raise Exception("Failed to parse XML document")
         
         question_sequence = 0
         
