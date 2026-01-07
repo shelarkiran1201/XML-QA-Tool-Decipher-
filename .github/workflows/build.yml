@@ -29,7 +29,7 @@ jobs:
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller --onefile --windowed --name="SurveyQAValidator" --icon=app_icon.ico --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.scrolledtext --hidden-import=docx --hidden-import=pandas --hidden-import=openpyxl --hidden-import=openpyxl.cell._writer --hidden-import=xml.etree.ElementTree --hidden-import=xml.dom.minidom myapp.py
+        pyinstaller --onefile --windowed --name="SurveyQAValidator" --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.scrolledtext --hidden-import=docx --hidden-import=pandas --hidden-import=openpyxl --hidden-import=openpyxl.cell._writer --hidden-import=xml.etree.ElementTree --hidden-import=xml.dom.minidom myapp.py
 
     - name: Upload EXE as Artifact
       uses: actions/upload-artifact@v4
